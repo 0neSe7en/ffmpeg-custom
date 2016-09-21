@@ -174,13 +174,14 @@ static av_cold int encode_init(AVCodecContext *avctx)
         av_log(avctx, AV_LOG_ERROR, "Error initializing libspeex\n");
         return -1;
     }
-    speex_init_header(&s->header, avctx->sample_rate, avctx->channels, mode);
+    printf("Start init speex header\n");
+//    speex_init_header(&s->header, avctx->sample_rate, avctx->channels, mode);
 
     /* rate control method and parameters */
-    if (avctx->flags & AV_CODEC_FLAG_QSCALE) {
-        /* VBR */
+ /*   if (avctx->flags & AV_CODEC_FLAG_QSCALE) {
+        *//* VBR *//*
         s->header.vbr = 1;
-        s->vad = 1; /* VAD is always implicitly activated for VBR */
+        s->vad = 1; *//* VAD is always implicitly activated for VBR *//*
         speex_encoder_ctl(s->enc_state, SPEEX_SET_VBR, &s->header.vbr);
         s->vbr_quality = av_clipf(avctx->global_quality / (float)FF_QP2LAMBDA,
                                   0.0f, 10.0f);
@@ -188,7 +189,7 @@ static av_cold int encode_init(AVCodecContext *avctx)
     } else {
         s->header.bitrate = avctx->bit_rate;
         if (avctx->bit_rate > 0) {
-            /* CBR or ABR by bitrate */
+            *//* CBR or ABR by bitrate *//*
             if (s->abr) {
                 speex_encoder_ctl(s->enc_state, SPEEX_SET_ABR,
                                   &s->header.bitrate);
@@ -201,39 +202,48 @@ static av_cold int encode_init(AVCodecContext *avctx)
                                   &s->header.bitrate);
             }
         } else {
-            /* CBR by quality */
+            *//* CBR by quality *//*
             speex_encoder_ctl(s->enc_state, SPEEX_SET_QUALITY,
                               &s->cbr_quality);
             speex_encoder_ctl(s->enc_state, SPEEX_GET_BITRATE,
                               &s->header.bitrate);
         }
-        /* stereo side information adds about 800 bps to the base bitrate */
-        /* TODO: this should be calculated exactly */
+        *//* stereo side information adds about 800 bps to the base bitrate *//*
+        *//* TODO: this should be calculated exactly *//*
         avctx->bit_rate = s->header.bitrate + (avctx->channels == 2 ? 800 : 0);
     }
+    */
+    speex_encoder_ctl(s->enc_state, SPEEX_SET_QUALITY,
+                      &s->cbr_quality);
+    speex_encoder_ctl(s->enc_state, SPEEX_GET_BITRATE,
+                      &avctx->bit_rate);
 
     /* VAD is activated with VBR or can be turned on by itself */
     if (s->vad)
         speex_encoder_ctl(s->enc_state, SPEEX_SET_VAD, &s->vad);
 
     /* Activiting Discontinuous Transmission */
+   /*
     if (s->dtx) {
         speex_encoder_ctl(s->enc_state, SPEEX_SET_DTX, &s->dtx);
         if (!(s->abr || s->vad || s->header.vbr))
             av_log(avctx, AV_LOG_WARNING, "DTX is not much of use without ABR, VAD or VBR\n");
     }
-
+*/
     /* set encoding complexity */
-    if (avctx->compression_level > FF_COMPRESSION_DEFAULT) {
+
+   /* if (avctx->compression_level > FF_COMPRESSION_DEFAULT) {
         complexity = av_clip(avctx->compression_level, 0, 10);
         speex_encoder_ctl(s->enc_state, SPEEX_SET_COMPLEXITY, &complexity);
     }
+    */
+    complexity = 2;
     speex_encoder_ctl(s->enc_state, SPEEX_GET_COMPLEXITY, &complexity);
     avctx->compression_level = complexity;
 
     /* set packet size */
-    avctx->frame_size = s->header.frame_size;
-    s->header.frames_per_packet = s->frames_per_packet;
+    avctx->frame_size = 320;
+//    s->header.frames_per_packet = s->frames_per_packet;
 
     /* set encoding delay */
     speex_encoder_ctl(s->enc_state, SPEEX_GET_LOOKAHEAD, &avctx->initial_padding);
@@ -242,26 +252,26 @@ static av_cold int encode_init(AVCodecContext *avctx)
     /* create header packet bytes from header struct */
     /* note: libspeex allocates the memory for header_data, which is freed
              below with speex_header_free() */
-    header_data = speex_header_to_packet(&s->header, &header_size);
+//    header_data = speex_header_to_packet(&s->header, &header_size);
 
     /* allocate extradata */
-    avctx->extradata = av_malloc(header_size + AV_INPUT_BUFFER_PADDING_SIZE);
-    if (!avctx->extradata) {
-        speex_header_free(header_data);
-        speex_encoder_destroy(s->enc_state);
-        av_log(avctx, AV_LOG_ERROR, "memory allocation error\n");
-        return AVERROR(ENOMEM);
-    }
+//    avctx->extradata = av_malloc(AV_INPUT_BUFFER_PADDING_SIZE);
+//    if (!avctx->extradata) {
+//        speex_header_free(header_data);
+//        speex_encoder_destroy(s->enc_state);
+//        av_log(avctx, AV_LOG_ERROR, "memory allocation error\n");
+//        return AVERROR(ENOMEM);
+//    }
 
     /* copy header packet to extradata */
-    memcpy(avctx->extradata, header_data, header_size);
-    avctx->extradata_size = header_size;
-    speex_header_free(header_data);
+//    memcpy(avctx->extradata, header_data, header_size);
+//    avctx->extradata_size = header_size;
+//    speex_header_free(header_data);
 
     /* init libspeex bitwriter */
     speex_bits_init(&s->bits);
 
-    print_enc_params(avctx, s);
+//    print_enc_params(avctx, s);
     return 0;
 }
 
@@ -274,8 +284,8 @@ static int encode_frame(AVCodecContext *avctx, AVPacket *avpkt,
 
     if (samples) {
         /* encode Speex frame */
-        if (avctx->channels == 2)
-            speex_encode_stereo_int(samples, s->header.frame_size, &s->bits);
+//        if (avctx->channels == 2)
+//            speex_encode_stereo_int(samples, s->header.frame_size, &s->bits);
         speex_encode_int(s->enc_state, samples, &s->bits);
         s->pkt_frame_count++;
         if ((ret = ff_af_queue_add(&s->afq, frame)) < 0)
@@ -318,7 +328,7 @@ static av_cold int encode_close(AVCodecContext *avctx)
     speex_encoder_destroy(s->enc_state);
 
     ff_af_queue_close(&s->afq);
-    av_freep(&avctx->extradata);
+//    av_freep(&avctx->extradata);
 
     return 0;
 }
