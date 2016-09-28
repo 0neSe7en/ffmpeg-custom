@@ -115,9 +115,9 @@ static av_cold void print_enc_params(AVCodecContext *avctx,
 
     av_log(avctx, AV_LOG_DEBUG, "channels: %d\n", avctx->channels);
     switch (s->header.mode) {
-    case SPEEX_MODEID_NB:  mode_str = "narrowband";     break;
-    case SPEEX_MODEID_WB:  mode_str = "wideband";       break;
-    case SPEEX_MODEID_UWB: mode_str = "ultra-wideband"; break;
+        case SPEEX_MODEID_NB:  mode_str = "narrowband";     break;
+        case SPEEX_MODEID_WB:  mode_str = "wideband";       break;
+        case SPEEX_MODEID_UWB: mode_str = "ultra-wideband"; break;
     }
     av_log(avctx, AV_LOG_DEBUG, "mode: %s\n", mode_str);
     if (s->header.vbr) {
@@ -153,19 +153,19 @@ static av_cold int encode_init(AVCodecContext *avctx)
     /* channels */
     if (avctx->channels < 1 || avctx->channels > 2) {
         av_log(avctx, AV_LOG_ERROR, "Invalid channels (%d). Only stereo and "
-               "mono are supported\n", avctx->channels);
+                "mono are supported\n", avctx->channels);
         return AVERROR(EINVAL);
     }
 
     /* sample rate and encoding mode */
     switch (avctx->sample_rate) {
-    case  8000: mode = &speex_nb_mode;  break;
-    case 16000: mode = &speex_wb_mode;  break;
-    case 32000: mode = &speex_uwb_mode; break;
-    default:
-        av_log(avctx, AV_LOG_ERROR, "Sample rate of %d Hz is not supported. "
-               "Resample to 8, 16, or 32 kHz.\n", avctx->sample_rate);
-        return AVERROR(EINVAL);
+        case  8000: mode = &speex_nb_mode;  break;
+        case 16000: mode = &speex_wb_mode;  break;
+        case 32000: mode = &speex_uwb_mode; break;
+        default:
+            av_log(avctx, AV_LOG_ERROR, "Sample rate of %d Hz is not supported. "
+                    "Resample to 8, 16, or 32 kHz.\n", avctx->sample_rate);
+            return AVERROR(EINVAL);
     }
 
     /* initialize libspeex */
@@ -174,70 +174,61 @@ static av_cold int encode_init(AVCodecContext *avctx)
         av_log(avctx, AV_LOG_ERROR, "Error initializing libspeex\n");
         return -1;
     }
-    printf("Start init speex header\n");
 //    speex_init_header(&s->header, avctx->sample_rate, avctx->channels, mode);
 
     /* rate control method and parameters */
- /*   if (avctx->flags & AV_CODEC_FLAG_QSCALE) {
-        *//* VBR *//*
-        s->header.vbr = 1;
-        s->vad = 1; *//* VAD is always implicitly activated for VBR *//*
-        speex_encoder_ctl(s->enc_state, SPEEX_SET_VBR, &s->header.vbr);
+    if (avctx->flags & AV_CODEC_FLAG_QSCALE) {
+        /* VBR */
+//        s->header.vbr = 1;
+        s->vad = 1; /* VAD is always implicitly activated for VBR */
+        int tmp = 1;
+        speex_encoder_ctl(s->enc_state, SPEEX_SET_VBR, &tmp);
         s->vbr_quality = av_clipf(avctx->global_quality / (float)FF_QP2LAMBDA,
                                   0.0f, 10.0f);
         speex_encoder_ctl(s->enc_state, SPEEX_SET_VBR_QUALITY, &s->vbr_quality);
     } else {
-        s->header.bitrate = avctx->bit_rate;
+//        s->header.bitrate = avctx->bit_rate;
         if (avctx->bit_rate > 0) {
-            *//* CBR or ABR by bitrate *//*
+            /* CBR or ABR by bitrate */
             if (s->abr) {
                 speex_encoder_ctl(s->enc_state, SPEEX_SET_ABR,
-                                  &s->header.bitrate);
+                                  &avctx->bit_rate);
                 speex_encoder_ctl(s->enc_state, SPEEX_GET_ABR,
-                                  &s->header.bitrate);
+                                  &avctx->bit_rate);
             } else {
                 speex_encoder_ctl(s->enc_state, SPEEX_SET_BITRATE,
-                                  &s->header.bitrate);
+                                  &avctx->bit_rate);
                 speex_encoder_ctl(s->enc_state, SPEEX_GET_BITRATE,
-                                  &s->header.bitrate);
+                                  &avctx->bit_rate);
             }
         } else {
-            *//* CBR by quality *//*
+            /* CBR by quality */
             speex_encoder_ctl(s->enc_state, SPEEX_SET_QUALITY,
                               &s->cbr_quality);
             speex_encoder_ctl(s->enc_state, SPEEX_GET_BITRATE,
-                              &s->header.bitrate);
+                              &avctx->bit_rate);
         }
-        *//* stereo side information adds about 800 bps to the base bitrate *//*
-        *//* TODO: this should be calculated exactly *//*
-        avctx->bit_rate = s->header.bitrate + (avctx->channels == 2 ? 800 : 0);
+        /* stereo side information adds about 800 bps to the base bitrate */
+        /* TODO: this should be calculated exactly */
+        avctx->bit_rate = avctx->channels == 2 ? 800 : 0;
     }
-    */
-    speex_encoder_ctl(s->enc_state, SPEEX_SET_QUALITY,
-                      &s->cbr_quality);
-    speex_encoder_ctl(s->enc_state, SPEEX_GET_BITRATE,
-                      &avctx->bit_rate);
 
     /* VAD is activated with VBR or can be turned on by itself */
     if (s->vad)
         speex_encoder_ctl(s->enc_state, SPEEX_SET_VAD, &s->vad);
 
     /* Activiting Discontinuous Transmission */
-   /*
     if (s->dtx) {
         speex_encoder_ctl(s->enc_state, SPEEX_SET_DTX, &s->dtx);
-        if (!(s->abr || s->vad || s->header.vbr))
-            av_log(avctx, AV_LOG_WARNING, "DTX is not much of use without ABR, VAD or VBR\n");
+//        if (!(s->abr || s->vad || s->vbr))
+//            av_log(avctx, AV_LOG_WARNING, "DTX is not much of use without ABR, VAD or VBR\n");
     }
-*/
-    /* set encoding complexity */
 
-   /* if (avctx->compression_level > FF_COMPRESSION_DEFAULT) {
+    /* set encoding complexity */
+    if (avctx->compression_level > FF_COMPRESSION_DEFAULT) {
         complexity = av_clip(avctx->compression_level, 0, 10);
         speex_encoder_ctl(s->enc_state, SPEEX_SET_COMPLEXITY, &complexity);
     }
-    */
-    complexity = 2;
     speex_encoder_ctl(s->enc_state, SPEEX_GET_COMPLEXITY, &complexity);
     avctx->compression_level = complexity;
 
@@ -255,7 +246,7 @@ static av_cold int encode_init(AVCodecContext *avctx)
 //    header_data = speex_header_to_packet(&s->header, &header_size);
 
     /* allocate extradata */
-//    avctx->extradata = av_malloc(AV_INPUT_BUFFER_PADDING_SIZE);
+//    avctx->extradata = av_malloc(header_size + AV_INPUT_BUFFER_PADDING_SIZE);
 //    if (!avctx->extradata) {
 //        speex_header_free(header_data);
 //        speex_encoder_destroy(s->enc_state);
@@ -336,43 +327,43 @@ static av_cold int encode_close(AVCodecContext *avctx)
 #define OFFSET(x) offsetof(LibSpeexEncContext, x)
 #define AE AV_OPT_FLAG_AUDIO_PARAM | AV_OPT_FLAG_ENCODING_PARAM
 static const AVOption options[] = {
-    { "abr",               "Use average bit rate",                      OFFSET(abr),               AV_OPT_TYPE_INT, { .i64 = 0 }, 0,   1, AE },
-    { "cbr_quality",       "Set quality value (0 to 10) for CBR",       OFFSET(cbr_quality),       AV_OPT_TYPE_INT, { .i64 = 8 }, 0,  10, AE },
-    { "frames_per_packet", "Number of frames to encode in each packet", OFFSET(frames_per_packet), AV_OPT_TYPE_INT, { .i64 = 1 }, 1,   8, AE },
-    { "vad",               "Voice Activity Detection",                  OFFSET(vad),               AV_OPT_TYPE_INT, { .i64 = 0 }, 0,   1, AE },
-    { "dtx",               "Discontinuous Transmission",                OFFSET(dtx),               AV_OPT_TYPE_INT, { .i64 = 0 }, 0,   1, AE },
-    { NULL },
+        { "abr",               "Use average bit rate",                      OFFSET(abr),               AV_OPT_TYPE_INT, { .i64 = 0 }, 0,   1, AE },
+        { "cbr_quality",       "Set quality value (0 to 10) for CBR",       OFFSET(cbr_quality),       AV_OPT_TYPE_INT, { .i64 = 8 }, 0,  10, AE },
+        { "frames_per_packet", "Number of frames to encode in each packet", OFFSET(frames_per_packet), AV_OPT_TYPE_INT, { .i64 = 1 }, 1,   8, AE },
+        { "vad",               "Voice Activity Detection",                  OFFSET(vad),               AV_OPT_TYPE_INT, { .i64 = 0 }, 0,   1, AE },
+        { "dtx",               "Discontinuous Transmission",                OFFSET(dtx),               AV_OPT_TYPE_INT, { .i64 = 0 }, 0,   1, AE },
+        { NULL },
 };
 
 static const AVClass speex_class = {
-    .class_name = "libspeex",
-    .item_name  = av_default_item_name,
-    .option     = options,
-    .version    = LIBAVUTIL_VERSION_INT,
+        .class_name = "libspeex",
+        .item_name  = av_default_item_name,
+        .option     = options,
+        .version    = LIBAVUTIL_VERSION_INT,
 };
 
 static const AVCodecDefault defaults[] = {
-    { "b",                 "0" },
-    { "compression_level", "3" },
-    { NULL },
+        { "b",                 "0" },
+        { "compression_level", "3" },
+        { NULL },
 };
 
 AVCodec ff_libspeex_encoder = {
-    .name           = "libspeex",
-    .long_name      = NULL_IF_CONFIG_SMALL("libspeex Speex"),
-    .type           = AVMEDIA_TYPE_AUDIO,
-    .id             = AV_CODEC_ID_SPEEX,
-    .priv_data_size = sizeof(LibSpeexEncContext),
-    .init           = encode_init,
-    .encode2        = encode_frame,
-    .close          = encode_close,
-    .capabilities   = AV_CODEC_CAP_DELAY,
-    .sample_fmts    = (const enum AVSampleFormat[]){ AV_SAMPLE_FMT_S16,
-                                                     AV_SAMPLE_FMT_NONE },
-    .channel_layouts = (const uint64_t[]){ AV_CH_LAYOUT_MONO,
-                                           AV_CH_LAYOUT_STEREO,
-                                           0 },
-    .supported_samplerates = (const int[]){ 8000, 16000, 32000, 0 },
-    .priv_class     = &speex_class,
-    .defaults       = defaults,
+        .name           = "libspeex",
+        .long_name      = NULL_IF_CONFIG_SMALL("libspeex Speex"),
+        .type           = AVMEDIA_TYPE_AUDIO,
+        .id             = AV_CODEC_ID_SPEEX,
+        .priv_data_size = sizeof(LibSpeexEncContext),
+        .init           = encode_init,
+        .encode2        = encode_frame,
+        .close          = encode_close,
+        .capabilities   = AV_CODEC_CAP_DELAY,
+        .sample_fmts    = (const enum AVSampleFormat[]){ AV_SAMPLE_FMT_S16,
+                                                         AV_SAMPLE_FMT_NONE },
+        .channel_layouts = (const uint64_t[]){ AV_CH_LAYOUT_MONO,
+                                               AV_CH_LAYOUT_STEREO,
+                                               0 },
+        .supported_samplerates = (const int[]){ 8000, 16000, 32000, 0 },
+        .priv_class     = &speex_class,
+        .defaults       = defaults,
 };
